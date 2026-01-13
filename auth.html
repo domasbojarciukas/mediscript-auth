@@ -1,69 +1,55 @@
 <!doctype html>
-<html>
-  <head>
-    <meta charset="utf-8" />
-    <title>Mediscript Auth</title>
-  </head>
-  <body>
-    <script type="module">
-  const SUPABASE_URL = "https://YOURPROJECT.supabase.co";
-  const SUPABASE_ANON_KEY = "YOUR_SUPABASE_ANON_KEY";
-  const STREAMLIT_APP_URL = "https://mediscript.streamlit.app";
-  const THIS_PAGE_URL = window.location.origin + window.location.pathname;
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Mediscript Auth Bridge</title>
+</head>
+<body>
+  <script>
+    (function () {
+      // ✅ IMPORTANT: set these to YOUR real values
+      const SUPABASE_URL = "https://REPLACE_WITH_YOUR_PROJECT_REF.supabase.co";
+      const APP_URL = "https://REPLACE_WITH_YOUR_STREAMLIT_APP"; // e.g. https://mediscript.streamlit.app
 
-  import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
+      // --- If tokens are returned in hash (#access_token=...) forward them to Streamlit as query params
+      const hash = window.location.hash || "";
+      const paramsHash = new URLSearchParams(hash.startsWith("#") ? hash.slice(1) : "");
 
-  const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-    auth: {
-      persistSession: true,
-      autoRefreshToken: true,
-      detectSessionInUrl: true,
-    },
-  });
+      const access_token = paramsHash.get("access_token");
+      const refresh_token = paramsHash.get("refresh_token");
+      const error = paramsHash.get("error");
+      const error_description = paramsHash.get("error_description");
 
-  async function redirectWithSession(session) {
-    const url = new URL(STREAMLIT_APP_URL);
-    url.searchParams.set("access_token", session.access_token);
-    url.searchParams.set("refresh_token", session.refresh_token);
-    window.location.replace(url.toString());
-  }
+      if (error || error_description) {
+        const url = new URL(APP_URL);
+        if (error) url.searchParams.set("error", error);
+        if (error_description) url.searchParams.set("error_description", error_description);
+        window.location.replace(url.toString());
+        return;
+      }
 
-  async function startLogin() {
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: "google",
-      options: { redirectTo: THIS_PAGE_URL },
-    });
-    if (error) {
-      const url = new URL(STREAMLIT_APP_URL);
-      url.searchParams.set("error", error.message || String(error));
-      window.location.replace(url.toString());
-    }
-  }
+      if (access_token && refresh_token) {
+        const url = new URL(APP_URL);
+        url.searchParams.set("access_token", access_token);
+        url.searchParams.set("refresh_token", refresh_token);
+        window.location.replace(url.toString());
+        return;
+      }
 
-  async function main() {
-    // 1) read current session (after callback, detectSessionInUrl populates it)
-    const { data } = await supabase.auth.getSession();
-    let session = data?.session;
+      // --- Otherwise, start OAuth from here (this page acts as both entry + return)
+      // Build authorize URL and send user to Supabase OAuth
+      const authorize = new URL(SUPABASE_URL.replace(/\/$/, "") + "/auth/v1/authorize");
+      authorize.searchParams.set("provider", "google");
 
-    // 2) IMPORTANT: force-refresh so Streamlit receives a valid, current session_id
-    if (session?.refresh_token) {
-      const { data: rdata, error: rerr } = await supabase.auth.refreshSession({
-        refresh_token: session.refresh_token,
-      });
-      if (!rerr && rdata?.session) session = rdata.session;
-    }
+      // redirect_to must point back to THIS PAGE
+      authorize.searchParams.set("redirect_to", window.location.href.split("#")[0]);
 
-    // 3) if we have a session, send fresh tokens to Streamlit
-    if (session?.access_token && session?.refresh_token) {
-      await redirectWithSession(session);
-      return;
-    }
+      // implicit flow so we get tokens in hash
+      authorize.searchParams.set("response_type", "token");
 
-    // 4) otherwise begin login
-    await startLogin();
-  }
-
-  main();
-    </script>
-  </body>
+      window.location.replace(authorize.toString());
+    })();
+  </script>
+</body>
 </html>
