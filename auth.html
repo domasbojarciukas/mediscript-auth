@@ -6,60 +6,64 @@
   </head>
   <body>
     <script type="module">
-      // ✅ FILL THESE IN (anon key is safe to be public)
-      const SUPABASE_URL = "https://wyexpnoaiaazlkhvqtki.supabase.co";
-      const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind5ZXhwbm9haWFhemxraHZxdGtpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjgzMDcxMDYsImV4cCI6MjA4Mzg4MzEwNn0.ne7Ke-v50l8V-GLn6fC4LjhQWbzX5VSJPPF0npcvWYk";
-      const STREAMLIT_APP_URL = "https://mediscript.streamlit.app"; // your app
-      const THIS_PAGE_URL = window.location.origin + window.location.pathname; // auth.html
+  const SUPABASE_URL = "https://YOURPROJECT.supabase.co";
+  const SUPABASE_ANON_KEY = "YOUR_SUPABASE_ANON_KEY";
+  const STREAMLIT_APP_URL = "https://mediscript.streamlit.app";
+  const THIS_PAGE_URL = window.location.origin + window.location.pathname;
 
-      import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
+  import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
 
-      const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-        auth: {
-          persistSession: true,
-          autoRefreshToken: true,
-          detectSessionInUrl: true, // ✅ handles PKCE callback
-        },
+  const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+    auth: {
+      persistSession: true,
+      autoRefreshToken: true,
+      detectSessionInUrl: true,
+    },
+  });
+
+  async function redirectWithSession(session) {
+    const url = new URL(STREAMLIT_APP_URL);
+    url.searchParams.set("access_token", session.access_token);
+    url.searchParams.set("refresh_token", session.refresh_token);
+    window.location.replace(url.toString());
+  }
+
+  async function startLogin() {
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: { redirectTo: THIS_PAGE_URL },
+    });
+    if (error) {
+      const url = new URL(STREAMLIT_APP_URL);
+      url.searchParams.set("error", error.message || String(error));
+      window.location.replace(url.toString());
+    }
+  }
+
+  async function main() {
+    // 1) read current session (after callback, detectSessionInUrl populates it)
+    const { data } = await supabase.auth.getSession();
+    let session = data?.session;
+
+    // 2) IMPORTANT: force-refresh so Streamlit receives a valid, current session_id
+    if (session?.refresh_token) {
+      const { data: rdata, error: rerr } = await supabase.auth.refreshSession({
+        refresh_token: session.refresh_token,
       });
+      if (!rerr && rdata?.session) session = rdata.session;
+    }
 
-      async function startLogin() {
-        const { error } = await supabase.auth.signInWithOAuth({
-          provider: "google",
-          options: {
-            redirectTo: THIS_PAGE_URL, // ✅ come back to auth.html
-          },
-        });
-        if (error) {
-          const url = new URL(STREAMLIT_APP_URL);
-          url.searchParams.set("error", error.message || String(error));
-          window.location.replace(url.toString());
-        }
-      }
+    // 3) if we have a session, send fresh tokens to Streamlit
+    if (session?.access_token && session?.refresh_token) {
+      await redirectWithSession(session);
+      return;
+    }
 
-      async function finishLoginOrStart() {
-        // If we already returned from Google/Supabase, session should be available
-        const { data, error } = await supabase.auth.getSession();
-        if (error) {
-          const url = new URL(STREAMLIT_APP_URL);
-          url.searchParams.set("error", error.message || String(error));
-          window.location.replace(url.toString());
-          return;
-        }
+    // 4) otherwise begin login
+    await startLogin();
+  }
 
-        const session = data?.session;
-        if (session?.access_token && session?.refresh_token) {
-          const url = new URL(STREAMLIT_APP_URL);
-          url.searchParams.set("access_token", session.access_token);
-          url.searchParams.set("refresh_token", session.refresh_token);
-          window.location.replace(url.toString());
-          return;
-        }
-
-        // No session yet -> start login
-        await startLogin();
-      }
-
-      finishLoginOrStart();
+  main();
     </script>
   </body>
 </html>
