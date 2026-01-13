@@ -1,25 +1,21 @@
 <!doctype html>
 <html>
-  <head>
-    <meta charset="utf-8" />
-    <title>Auth redirect…</title>
-  </head>
+  <head><meta charset="utf-8" /><title>Auth redirect…</title></head>
   <body>
     <script>
-      // 🔴 CHANGE THIS to your Streamlit app URL
-      const STREAMLIT_APP_URL = "https://mediscript.streamlit.app";
+      const STREAMLIT_APP_URL = "https://mediscript.streamlit.app"; // <-- your app
 
-      const hash = window.location.hash.startsWith("#")
-        ? window.location.hash.slice(1)
-        : "";
-
+      const hash = window.location.hash.startsWith("#") ? window.location.hash.slice(1) : "";
       const params = new URLSearchParams(hash);
 
       const access_token = params.get("access_token");
       const refresh_token = params.get("refresh_token");
+      const state = params.get("state");
       const error = params.get("error_description") || params.get("error");
 
       const url = new URL(STREAMLIT_APP_URL);
+
+      if (state) url.searchParams.set("state", state);
 
       if (error) {
         url.searchParams.set("error", error);
