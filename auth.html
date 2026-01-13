@@ -1,32 +1,65 @@
 <!doctype html>
 <html>
-  <head><meta charset="utf-8" /><title>Auth redirect…</title></head>
+  <head>
+    <meta charset="utf-8" />
+    <title>Mediscript Auth</title>
+  </head>
   <body>
-    <script>
-      const STREAMLIT_APP_URL = "https://mediscript.streamlit.app"; // <-- your app
+    <script type="module">
+      // ✅ FILL THESE IN (anon key is safe to be public)
+      const SUPABASE_URL = "https://YOURPROJECT.supabase.co";
+      const SUPABASE_ANON_KEY = "YOUR_SUPABASE_ANON_KEY";
+      const STREAMLIT_APP_URL = "https://mediscript.streamlit.app"; // your app
+      const THIS_PAGE_URL = window.location.origin + window.location.pathname; // auth.html
 
-      const hash = window.location.hash.startsWith("#") ? window.location.hash.slice(1) : "";
-      const params = new URLSearchParams(hash);
+      import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
 
-      const access_token = params.get("access_token");
-      const refresh_token = params.get("refresh_token");
-      const state = params.get("state");
-      const error = params.get("error_description") || params.get("error");
+      const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+        auth: {
+          persistSession: true,
+          autoRefreshToken: true,
+          detectSessionInUrl: true, // ✅ handles PKCE callback
+        },
+      });
 
-      const url = new URL(STREAMLIT_APP_URL);
-
-      if (state) url.searchParams.set("state", state);
-
-      if (error) {
-        url.searchParams.set("error", error);
-      } else if (access_token && refresh_token) {
-        url.searchParams.set("access_token", access_token);
-        url.searchParams.set("refresh_token", refresh_token);
-      } else {
-        url.searchParams.set("error", "missing_tokens_from_oauth_redirect");
+      async function startLogin() {
+        const { error } = await supabase.auth.signInWithOAuth({
+          provider: "google",
+          options: {
+            redirectTo: THIS_PAGE_URL, // ✅ come back to auth.html
+          },
+        });
+        if (error) {
+          const url = new URL(STREAMLIT_APP_URL);
+          url.searchParams.set("error", error.message || String(error));
+          window.location.replace(url.toString());
+        }
       }
 
-      window.location.replace(url.toString());
+      async function finishLoginOrStart() {
+        // If we already returned from Google/Supabase, session should be available
+        const { data, error } = await supabase.auth.getSession();
+        if (error) {
+          const url = new URL(STREAMLIT_APP_URL);
+          url.searchParams.set("error", error.message || String(error));
+          window.location.replace(url.toString());
+          return;
+        }
+
+        const session = data?.session;
+        if (session?.access_token && session?.refresh_token) {
+          const url = new URL(STREAMLIT_APP_URL);
+          url.searchParams.set("access_token", session.access_token);
+          url.searchParams.set("refresh_token", session.refresh_token);
+          window.location.replace(url.toString());
+          return;
+        }
+
+        // No session yet -> start login
+        await startLogin();
+      }
+
+      finishLoginOrStart();
     </script>
   </body>
 </html>
