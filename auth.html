@@ -8,45 +8,77 @@
 <body>
   <script>
     (function () {
-      // ✅ IMPORTANT: set these to YOUR real values
-      const SUPABASE_URL = "https://REPLACE_WITH_YOUR_PROJECT_REF.supabase.co";
-      const APP_URL = "https://REPLACE_WITH_YOUR_STREAMLIT_APP"; // e.g. https://mediscript.streamlit.app
+      // ====== CONFIG: set to your real values ======
+      const SUPABASE_URL = "https://YOUR_PROJECT_REF.supabase.co";
+      const APP_URL = "https://YOUR_STREAMLIT_APP"; // e.g. https://mediscript.streamlit.app
 
-      // --- If tokens are returned in hash (#access_token=...) forward them to Streamlit as query params
+      // Optional: allow ?next=/some/path to be carried back to Streamlit
+      const urlNow = new URL(window.location.href);
+      const next = urlNow.searchParams.get("next") || "";
+
+      // ====== 1) If tokens returned in hash (#access_token=...), forward to Streamlit ======
       const hash = window.location.hash || "";
-      const paramsHash = new URLSearchParams(hash.startsWith("#") ? hash.slice(1) : "");
+      const hashParams = new URLSearchParams(hash.startsWith("#") ? hash.slice(1) : "");
 
-      const access_token = paramsHash.get("access_token");
-      const refresh_token = paramsHash.get("refresh_token");
-      const error = paramsHash.get("error");
-      const error_description = paramsHash.get("error_description");
+      const access_token = hashParams.get("access_token");
+      const refresh_token = hashParams.get("refresh_token");
+      const expires_in = hashParams.get("expires_in");
+      const token_type = hashParams.get("token_type");
+
+      const error = hashParams.get("error") || urlNow.searchParams.get("error");
+      const error_description =
+        hashParams.get("error_description") || urlNow.searchParams.get("error_description");
 
       if (error || error_description) {
-        const url = new URL(APP_URL);
-        if (error) url.searchParams.set("error", error);
-        if (error_description) url.searchParams.set("error_description", error_description);
-        window.location.replace(url.toString());
+        const out = new URL(APP_URL);
+        if (next) out.searchParams.set("next", next);
+        if (error) out.searchParams.set("error", error);
+        if (error_description) out.searchParams.set("error_description", error_description);
+        window.location.replace(out.toString());
         return;
       }
 
       if (access_token && refresh_token) {
-        const url = new URL(APP_URL);
-        url.searchParams.set("access_token", access_token);
-        url.searchParams.set("refresh_token", refresh_token);
-        window.location.replace(url.toString());
+        const out = new URL(APP_URL);
+        if (next) out.searchParams.set("next", next);
+
+        out.searchParams.set("access_token", access_token);
+        out.searchParams.set("refresh_token", refresh_token);
+        if (expires_in) out.searchParams.set("expires_in", expires_in);
+        if (token_type) out.searchParams.set("token_type", token_type);
+
+        window.location.replace(out.toString());
         return;
       }
 
-      // --- Otherwise, start OAuth from here (this page acts as both entry + return)
-      // Build authorize URL and send user to Supabase OAuth
+      // ====== 2) Otherwise start OAuth (this page acts as entry + return) ======
+      // Guard to avoid infinite loops if something fails before returning tokens
+      const guardKey = "ms_oauth_attempted";
+      const attempted = sessionStorage.getItem(guardKey);
+
+      if (attempted === "1") {
+        const out = new URL(APP_URL);
+        if (next) out.searchParams.set("next", next);
+        out.searchParams.set("error", "oauth_failed");
+        out.searchParams.set("error_description", "OAuth did not return tokens. Check redirect URLs and provider config.");
+        window.location.replace(out.toString());
+        return;
+      }
+      sessionStorage.setItem(guardKey, "1");
+
+      // Build authorize URL
       const authorize = new URL(SUPABASE_URL.replace(/\/$/, "") + "/auth/v1/authorize");
       authorize.searchParams.set("provider", "google");
 
-      // redirect_to must point back to THIS PAGE
+      // redirect_to must point back to THIS PAGE (no hash)
       authorize.searchParams.set("redirect_to", window.location.href.split("#")[0]);
 
-      // implicit flow so we get tokens in hash
+      // Implicit flow: tokens in hash
       authorize.searchParams.set("response_type", "token");
+
+      // Optional: ask for refresh token from Google (Supabase handles provider-side config too)
+      authorize.searchParams.set("access_type", "offline");
+      authorize.searchParams.set("prompt", "consent");
 
       window.location.replace(authorize.toString());
     })();
