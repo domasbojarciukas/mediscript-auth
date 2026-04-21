@@ -1,30 +1,25 @@
-<!doctype html>
-<html>
-<head>
-  <meta charset="utf-8" />
-  <title>Mediscript Auth Redirect</title>
-</head>
-<body>
-  <script>
-    const hash = window.location.hash.substring(1);
-    const params = new URLSearchParams(hash);
+<script>
+  const hash = window.location.hash.substring(1);
+  const query = window.location.search.substring(1);
 
-    const accessToken = params.get("access_token");
-    const refreshToken = params.get("refresh_token");
+  const hashParams = new URLSearchParams(hash);
+  const queryParams = new URLSearchParams(query);
 
-    // ✅ IMPORTANT: correct domain
-    const APP_URL = "https://app.mediscript.app";
+  const accessToken = hashParams.get("access_token");
+  const refreshToken = hashParams.get("refresh_token");
+  const code = queryParams.get("code");
 
-    if (accessToken && refreshToken) {
-      const target = new URL(APP_URL);
+  const target = new URL("https://app.mediscript.app");
 
-      target.searchParams.set("access_token", accessToken);
-      target.searchParams.set("refresh_token", refreshToken);
+  if (accessToken && refreshToken) {
+    target.searchParams.set("access_token", accessToken);
+    target.searchParams.set("refresh_token", refreshToken);
+  }
 
-      window.location.replace(target.toString());
-    } else {
-      window.location.replace(APP_URL);
-    }
-  </script>
-</body>
-</html>
+  // 👇 THIS IS WHAT YOU WERE MISSING
+  else if (code) {
+    target.searchParams.set("code", code);
+  }
+
+  window.location.replace(target.toString());
+</script>
