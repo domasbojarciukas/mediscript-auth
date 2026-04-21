@@ -6,24 +6,24 @@
 </head>
 <body>
   <script>
-    // Extract tokens from Supabase URL fragment
     const hash = window.location.hash.substring(1);
     const params = new URLSearchParams(hash);
 
     const accessToken = params.get("access_token");
     const refreshToken = params.get("refresh_token");
 
-    // Redirect back to your Streamlit app with tokens
+    // ✅ IMPORTANT: correct domain
+    const APP_URL = "https://app.mediscript.app";
+
     if (accessToken && refreshToken) {
-      const target = new URL("https://mediscript.streamlit.app");
+      const target = new URL(APP_URL);
 
       target.searchParams.set("access_token", accessToken);
       target.searchParams.set("refresh_token", refreshToken);
 
       window.location.replace(target.toString());
     } else {
-      // fallback
-      window.location.replace("https://mediscript.streamlit.app");
+      window.location.replace(APP_URL);
     }
   </script>
 </body>
