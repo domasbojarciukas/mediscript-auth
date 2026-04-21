@@ -1,25 +1,18 @@
 <script>
-  const hash = window.location.hash.substring(1);
-  const query = window.location.search.substring(1);
+const hash = window.location.hash.substring(1);
+const params = new URLSearchParams(hash);
 
-  const hashParams = new URLSearchParams(hash);
-  const queryParams = new URLSearchParams(query);
+const accessToken = params.get("access_token");
+const refreshToken = params.get("refresh_token");
 
-  const accessToken = hashParams.get("access_token");
-  const refreshToken = hashParams.get("refresh_token");
-  const code = queryParams.get("code");
+if (accessToken && refreshToken) {
+  const target = new URL("https://mediscript.streamlit.app");
 
-  const target = new URL("https://app.mediscript.app");
-
-  if (accessToken && refreshToken) {
-    target.searchParams.set("access_token", accessToken);
-    target.searchParams.set("refresh_token", refreshToken);
-  }
-
-  // 👇 THIS IS WHAT YOU WERE MISSING
-  else if (code) {
-    target.searchParams.set("code", code);
-  }
+  target.searchParams.set("access_token", accessToken);
+  target.searchParams.set("refresh_token", refreshToken);
 
   window.location.replace(target.toString());
+} else {
+  window.location.replace("https://mediscript.streamlit.app");
+}
 </script>
