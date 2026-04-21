@@ -1,18 +1,32 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Mediscript Auth</title>
+</head>
+<body>
 <script>
-const hash = window.location.hash.substring(1);
-const params = new URLSearchParams(hash);
+  // 🔥 CRITICAL: tokens are in HASH, not query
+  const hash = window.location.hash.substring(1);
+  const params = new URLSearchParams(hash);
 
-const accessToken = params.get("access_token");
-const refreshToken = params.get("refresh_token");
+  const accessToken = params.get("access_token");
+  const refreshToken = params.get("refresh_token");
 
-if (accessToken && refreshToken) {
-  const target = new URL("https://mediscript.streamlit.app");
+  console.log("HASH:", hash);
+  console.log("ACCESS:", accessToken);
 
-  target.searchParams.set("access_token", accessToken);
-  target.searchParams.set("refresh_token", refreshToken);
+  if (accessToken && refreshToken) {
+    const target = new URL("https://mediscript.streamlit.app");
 
-  window.location.replace(target.toString());
-} else {
-  window.location.replace("https://mediscript.streamlit.app");
-}
+    target.searchParams.set("access_token", accessToken);
+    target.searchParams.set("refresh_token", refreshToken);
+
+    window.location.replace(target.toString());
+  } else {
+    // fallback
+    window.location.replace("https://mediscript.streamlit.app");
+  }
 </script>
+</body>
+</html>
